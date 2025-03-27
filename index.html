@@ -6,6 +6,7 @@
     <title>Submit New Samples</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
     <style>
       body {
@@ -141,6 +142,13 @@
           style="display: none; background-color: green"
         >
           Save Sample(s)?
+        </button>
+        <button
+          id="print-button"
+          onclick="printReport()"
+          style="display: none; background-color: darkred"
+        >
+          Print Report
         </button>
 
         <div id="error-message" class="error-message"></div>
@@ -733,6 +741,7 @@
 
         // Show "Save Sample(s)?" button if there are rows
         document.getElementById("save-button").style.display = "inline-block";
+        document.getElementById("print-button").style.display = "inline-block";
       }
 
       function initCharts() {
@@ -1118,6 +1127,66 @@
         document.getElementById("match-count").textContent = matchCount;
         document.getElementById("variance-display-label").textContent =
           variance.toFixed(1);
+      }
+
+      function printReport() {
+        const rows = document.querySelectorAll("#results-table tbody tr");
+        if (rows.length === 0) return;
+
+        const date = new Date().toLocaleDateString();
+        const badgeID = "12345";
+
+        let reportHTML = `
+    <html>
+    <head><style>
+      body { font-family: Arial; font-size: 12pt; }
+      h1, h2 { text-align: center; font-size: 14pt; font-weight: bold; }
+      .subhead { font-size: 12pt; font-weight: bold; text-align: left; margin-top: 10px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12pt; text-align: center; }
+      th, td { border: 1px solid #000; padding: 5px; }
+    </style></head>
+    <body>
+  <div style="border: 2px solid black; padding: 30px;">
+
+    <h1>DUBAI POLICE</h1>
+    <h1>Forensic Mass Spectrum Analysis</h1>
+    <div class="subhead">Date: ${date}</div>
+    <div class="subhead">Badge ID: ${badgeID}</div>
+    <div class="subhead" style="margin-top: 20px;">Comments:</div>
+    <br> <br>
+    <div style="margin-left: 10px;">The following new samples were successfully identified:</div>
+    <br>
+
+    <table>
+      <tr>
+        <th>Sample ID</th>
+        <th>Drug Type</th>
+        <th>Retention Time</th>
+        <th>Maximum Abundance</th>
+        <th>Spectrum Match %</th>
+      </tr>`;
+
+        rows.forEach((row) => {
+          const cells = row.querySelectorAll("td");
+          reportHTML += `<tr>${[...cells]
+            .map((td) => `<td>${td.textContent}</td>`)
+            .join("")}</tr>`;
+        });
+
+        reportHTML += `
+      </table>
+      <div style="margin-top: 80px; text-align: center;">
+        _________________________________________<br>
+        Signature
+      </div>
+      </div>
+    </body></html>`;
+
+        const blob = new Blob(["\ufeff", reportHTML], {
+          type: "application/msword",
+        });
+
+        saveAs(blob, `Forensic_Report_${date.replace(/\//g, "-")}.doc`);
       }
     </script>
   </body>
