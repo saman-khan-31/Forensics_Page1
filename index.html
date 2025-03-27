@@ -157,6 +157,15 @@
           <strong>Upload in batch</strong><br /><br />
           <input type="file" id="batch-upload" multiple /><br />
         </div>
+        <div class="section">
+          <strong>Enter Case ID:</strong><br />
+          <input
+            type="text"
+            id="case-id-input"
+            placeholder="Enter Case ID"
+          /><br />
+        </div>
+
         <button onclick="validateUploads()">Submit</button>
         <button
           id="save-button"
@@ -181,6 +190,7 @@
         <table id="results-table">
           <thead>
             <tr>
+              <th>Case ID</th>
               <th>Sample ID</th>
               <th>Drug Type</th>
               <th>Retention Time</th>
@@ -252,14 +262,8 @@
       </div>
     </div>
 
-    <h1 style="text-align: center">Drug Sample Matching</h1>
-    <h4 style="text-align: center">
-      Explore the matching samples with close retention times to the selected
-      sample. By adjusting the slider, the samples with a difference in
-      retention time within the allowed variance (±) will be filtered and
-      displayed.
-    </h4>
-    <div class="matching-section" style="width: 100%; margin-top: 30px">
+    <h1 style="text-align: center">All Saved Samples</h1>
+    <div class="matching-section" style="width: 100%; margin-top: 5px">
       <div style="display: flex; width: 100%">
         <!-- Left 50%: All Samples Table -->
         <div style="width: 100%; padding: 20px">
@@ -268,7 +272,7 @@
               display: flex;
               justify-content: space-between;
               align-items: center;
-              margin-bottom: 10px;
+              margin-bottom: 0px;
             "
           >
             <div
@@ -276,7 +280,7 @@
                 display: flex;
                 align-items: center;
                 gap: 10px;
-                margin-bottom: 10px;
+                margin-bottom: 0px;
               "
             >
               <label for="case-filter"
@@ -863,7 +867,10 @@
       function addToTable(id, drug, rt, abundance) {
         const row = document.createElement("tr");
 
-        // Compute spectrum similarity here
+        // Get case ID from input
+        const caseID = document.getElementById("case-id-input").value || "N/A";
+
+        // Compute spectrum similarity
         const sampleText = spectrumFiles[id];
         const lines = sampleText.trim().split("\n").slice(4);
         const sampleSpectrum = {};
@@ -891,17 +898,19 @@
         const simScore = cosineSimilarity(normSample, normRef);
         const matchPercent = (simScore * 100).toFixed(2);
 
-        // Create the row HTML
-        row.innerHTML = `<td>${id}</td>
-                   <td>${drug}</td>
-                   <td>${rt.toFixed(3)}</td>
-                   <td>${abundance}</td>
-                   <td>${matchPercent}%</td>`; // ✅ New column added
+        // Add row to new samples table
+        row.innerHTML = `
+    <td>${caseID}</td>
+    <td>${id}</td>
+    <td>${drug}</td>
+    <td>${rt.toFixed(3)}</td>
+    <td>${abundance}</td>
+    <td>${matchPercent}%</td>`;
 
         row.onclick = () => updateSampleChart(id);
         document.querySelector("#results-table tbody").appendChild(row);
 
-        // Show "Save Sample(s)?" button if there are rows
+        // Show "Save Sample(s)?" button if rows exist
         document.getElementById("save-button").style.display = "inline-block";
         document.getElementById("print-button").style.display = "inline-block";
       }
@@ -1044,13 +1053,15 @@
         const infoDiv = document.getElementById("info-mode-container");
 
         infoDiv.innerHTML = `
-  Sample <strong>${sampleID}</strong> contained <strong>${rowCount}</strong> rows of data, 
-  from which a maximum abundance of <strong>${maxAb}</strong> was retrieved, 
-  this is the total intensity of a detected substance in forensic drug testing. 
-  A retention time of <strong>${
-    refLabels[alignedData.indexOf(maxAb)]
-  }</strong> was found, 
-  which is the time it takes for a compound to travel through the chromatography column.
+  <div style="font-size: 16px; line-height: 1.5;">
+    Sample <strong>${sampleID}</strong> contained <strong>${rowCount}</strong> rows of data, 
+    from which a maximum abundance of <strong>${maxAb}</strong> was retrieved, 
+    this is the total intensity of a detected substance in forensic drug testing. 
+    A retention time of <strong>${
+      refLabels[alignedData.indexOf(maxAb)]
+    }</strong> was found, 
+    which is the time it takes for a compound to travel through the chromatography column.
+  </div>
 `;
 
         for (let refMz of cocainePeaks) {
@@ -1108,7 +1119,7 @@
           const tr = document.createElement("tr");
 
           // Create new row with submission time
-          for (let i = 0; i < cells.length; i++) {
+          for (let i = 0; i < 5; i++) {
             const td = document.createElement("td");
             td.textContent = cells[i].textContent;
             tr.appendChild(td);
@@ -1124,7 +1135,39 @@
           allSamplesTable.insertBefore(tr, allSamplesTable.firstChild);
         });
 
+        // ✅ Call updateCaseFilter() to update dropdown dynamically
+        updateCaseFilter();
+
         alert("Sample(s) added to All Samples!");
+      }
+
+      function updateCaseFilter() {
+        const rows = document.querySelectorAll("#all-samples-table tbody tr");
+        const caseSet = new Set();
+
+        // Collect unique Case IDs from All Samples table
+        rows.forEach((row) => {
+          const caseID = row.children[0].textContent; // Case ID is in the first column
+          if (caseID) {
+            caseSet.add(caseID);
+          }
+        });
+
+        // Get the case filter dropdown
+        const caseFilter = document.getElementById("case-filter");
+
+        // Clear existing options except 'All'
+        const defaultOption = caseFilter.querySelector("option[value='']");
+        caseFilter.innerHTML = ""; // Clear all options
+        caseFilter.appendChild(defaultOption); // Add back the default 'All' option
+
+        // Add unique case IDs as new options
+        caseSet.forEach((caseID) => {
+          const option = document.createElement("option");
+          option.value = caseID;
+          option.textContent = caseID;
+          caseFilter.appendChild(option);
+        });
       }
 
       const initialSamples = [
@@ -1200,8 +1243,11 @@
       }
 
       // Initialize empty charts
-      window.onload = initCharts;
-      loadInitialSamples();
+      window.onload = () => {
+        initCharts();
+        loadInitialSamples();
+        updateCaseFilter(); // ✅ Add this to load Case IDs on page load
+      };
 
       const selectedDrugs = new Set();
 
@@ -1365,6 +1411,7 @@
 
     <table>
       <tr>
+        <th>Case ID</th>
         <th>Sample ID</th>
         <th>Drug Type</th>
         <th>Retention Time</th>
@@ -1428,7 +1475,7 @@
         .addEventListener("click", (e) => {
           const row = e.target.closest("tr");
           if (!row) return;
-          const sampleID = row.children[0].textContent;
+          const sampleID = row.children[1].textContent;
           updateSampleChart(sampleID); // 🔁 this triggers both chart and info view update
         });
 
