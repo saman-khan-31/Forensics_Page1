@@ -15,6 +15,13 @@
         padding: 0;
       }
 
+      .chart-area {
+        width: 40%;
+        padding: 20px;
+        min-height: 600px; /* ✅ Set minimum height */
+        box-sizing: border-box;
+      }
+
       h1 {
         text-align: center;
         margin-top: 20px;
@@ -120,6 +127,21 @@
       .matching-section {
         background-color: white;
       }
+
+      .mode-pill {
+        padding: 6px 14px;
+        border-radius: 15px;
+        background-color: #eee;
+        font-weight: bold;
+        cursor: pointer;
+        user-select: none;
+        border: 1px solid #ccc;
+      }
+      .mode-pill.active {
+        background-color: #007bff;
+        color: white;
+        border: 1px solid #007bff;
+      }
     </style>
   </head>
   <body>
@@ -172,19 +194,152 @@
       </div>
 
       <div class="chart-area">
-        <h4>Cocaine Spectrum Reference</h4>
-        <canvas id="referenceChart" width="400" height="200"></canvas>
-        <h4>Sample Spectrum</h4>
         <div
-          id="match-info"
-          style="
-            margin-bottom: 10px;
-            font-weight: bold;
-            color: #333;
-            font-size: 14px;
-          "
+          id="mode-toggle"
+          style="display: flex; gap: 10px; margin-bottom: 15px"
+        >
+          <div class="mode-pill active" data-mode="info">Info</div>
+          <div class="mode-pill" data-mode="spectrum">Compare Spectrum</div>
+          <div class="mode-pill" data-mode="peaks">View Peaks</div>
+        </div>
+
+        <div id="chart-mode-container">
+          <h4>Cocaine Spectrum Reference</h4>
+          <canvas id="referenceChart" width="400" height="200"></canvas>
+          <h4>Sample Spectrum</h4>
+          <div
+            id="match-info"
+            style="
+              margin-bottom: 10px;
+              font-weight: bold;
+              color: #333;
+              font-size: 14px;
+            "
+          ></div>
+          <canvas id="sampleChart" width="400" height="200"></canvas>
+        </div>
+
+        <div
+          id="info-mode-container"
+          style="display: none; font-size: 14px; line-height: 1.5"
         ></div>
-        <canvas id="sampleChart" width="400" height="200"></canvas>
+
+        <div id="peaks-mode-container" style="display: none">
+          <label for="peaks-dropdown"><strong>Show Peaks:</strong></label>
+          <select id="peaks-dropdown">
+            <option value="5" selected>Top 5</option>
+            <option value="10">Top 10</option>
+          </select>
+
+          <div style="max-height: 250px; overflow-y: auto; margin-top: 10px">
+            <table
+              id="peaks-table"
+              style="width: 100%; border-collapse: collapse"
+            >
+              <thead>
+                <tr>
+                  <th>Peak</th>
+                  <th>Abundance</th>
+                  <th>Retention Time</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <canvas id="peaksChart" height="250"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <h1 style="text-align: center">Drug Sample Matching</h1>
+    <h4 style="text-align: center">
+      Explore the matching samples with close retention times to the selected
+      sample. By adjusting the slider, the samples with a difference in
+      retention time within the allowed variance (±) will be filtered and
+      displayed.
+    </h4>
+    <div class="matching-section" style="width: 100%; margin-top: 30px">
+      <div style="display: flex; width: 100%">
+        <!-- Left 50%: All Samples Table -->
+        <div style="width: 100%; padding: 20px">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 10px;
+            "
+          >
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin-bottom: 10px;
+              "
+            >
+              <label for="case-filter"
+                ><strong>Filter by Case ID:</strong></label
+              >
+              <select id="case-filter">
+                <option value="">All</option>
+                <option value="C1">C1</option>
+                <option value="C2">C2</option>
+                <option value="C3">C3</option>
+                <option value="C4">C4</option>
+              </select>
+            </div>
+
+            <!-- Filter Buttons -->
+            <div
+              id="drug-filters"
+              style="display: flex; gap: 8px; flex-wrap: wrap"
+            >
+              <div class="drug-pill" data-drug="Cocaine">Cocaine</div>
+              <div class="drug-pill" data-drug="Heroin">Heroin</div>
+              <div class="drug-pill" data-drug="Methamphetamine">
+                Methamphetamine
+              </div>
+            </div>
+
+            <!-- Total Samples Count -->
+            <div style="text-align: right">
+              <div style="font-size: 50px; font-weight: bold" id="sample-count">
+                20
+              </div>
+              <div style="font-size: 15px; color: #555">Total Samples</div>
+            </div>
+          </div>
+
+          <h3>All Samples</h3>
+          <div
+            style="max-height: 400px; overflow-y: auto; border: 1px solid #ccc"
+          >
+            <table
+              id="all-samples-table"
+              border="1"
+              cellpadding="8"
+              style="width: 100%; border-collapse: collapse"
+            >
+              <thead
+                style="position: sticky; top: 0; background-color: #f1f1f1"
+              >
+                <tr>
+                  <th>Case ID</th>
+                  <th>Sample ID</th>
+                  <th>Drug Type</th>
+                  <th>Retention Time</th>
+                  <th>Maximum Abundance</th>
+                  <th>Submission Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Preloaded + new rows go here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -345,6 +500,11 @@
     </div>
 
     <script>
+      const chromFiles = {}; // sampleID => CHROMTAB content
+
+      const sampleRetention = {}; // sampleID => retentionTime
+      const sampleAbundance = {}; // sampleID => maxAbundance
+
       const referenceSpectrum = {
         40.1: 39968,
         41.1: 281344,
@@ -617,6 +777,8 @@
                 const { maxAbundance, retentionTime } =
                   getMaxFromChrom(chromData);
                 spectrumFiles[id] = specData; // Save spectrum for chart later
+                chromFiles[id] = chromData; // ✅ store CHROMTAB content
+
                 const drugType = matchCocaine(specData) ? "Cocaine" : "Unknown";
                 addToTable(id, drugType, retentionTime, maxAbundance);
               }
@@ -839,6 +1001,8 @@
       }
 
       function updateSampleChart(sampleID) {
+        latestSampleID = sampleID;
+
         const text = spectrumFiles[sampleID];
         const lines = text.trim().split("\n").slice(4);
         const sampleSpectrum = {};
@@ -872,6 +1036,22 @@
         let matchedMarkers = 0;
         const tolerance = 0.5;
         const maxAb = Math.max(...alignedData);
+
+        const chromText = chromFiles[sampleID];
+
+        const chromLines = chromText.trim().split("\n");
+        const rowCount = chromLines.length - 3; // skip header lines
+        const infoDiv = document.getElementById("info-mode-container");
+
+        infoDiv.innerHTML = `
+  Sample <strong>${sampleID}</strong> contained <strong>${rowCount}</strong> rows of data, 
+  from which a maximum abundance of <strong>${maxAb}</strong> was retrieved, 
+  this is the total intensity of a detected substance in forensic drug testing. 
+  A retention time of <strong>${
+    refLabels[alignedData.indexOf(maxAb)]
+  }</strong> was found, 
+  which is the time it takes for a compound to travel through the chromatography column.
+`;
 
         for (let refMz of cocainePeaks) {
           for (let i = 0; i < refLabels.length; i++) {
@@ -914,6 +1094,7 @@
         };
 
         sampleChart.update();
+        updateModeView();
       }
 
       function saveSamplesLocally() {
@@ -947,49 +1128,60 @@
       }
 
       const initialSamples = [
-        ["S1", "Cocaine", 16.441, 39398596, "4/28/2022 1:35:00 PM"],
-        ["S2", "Cocaine", 15.72, 150864944, "12/16/2022 7:34:00 PM"],
-        ["S3", "Cocaine", 16.211, 11632325, "2/21/2022 2:49:00 PM"],
-        ["S4", "Cocaine", 15.463, 25371720, "4/11/2022 02:26:00 PM"],
-        ["S5", "Cocaine", 15.149, 3080717, "1/09/2022 03:18:00 PM"],
-        ["S6", "Cocaine", 16.444, 39398596, "5/29/2022 7:35:00 PM"],
-        ["S7", "Cocaine", 15.92, 458923852, "12/30/2022 8:13:00 PM"],
-        ["S8", "Cocaine", 16.455, 32857482, "5/31/2022 12:00:00 PM"],
-        ["S9", "Cocaine", 15.457, 57296846, "1/20/2022 9:20:00 PM"],
-        ["S10", "Cocaine", 15.423, 113748525, "1/07/2022 8:34:00 PM"],
-        ["S11", "Heroin", 20.132, 869472714, "4/22/2022 8:26:00 PM"],
-        ["S12", "Heroin", 21.967, 294958194, "03/15/2022 4:49:00 PM"],
-        ["S13", "Heroin", 20.136, 973718485, "05/20/2022 4:20:00 PM"],
-        ["S14", "Heroin", 20.142, 1253547582, "4/03/2022 7:59:00 PM"],
-        ["S15", "Heroin", 20.563, 8883747569, "8/11/2022 6:39:00 PM"],
+        ["C1", "S1", "Cocaine", 16.441, 39398596, "4/28/2022 1:35:00 PM"],
+        ["C1", "S2", "Cocaine", 15.72, 150864944, "12/16/2022 7:34:00 PM"],
+        ["C1", "S3", "Cocaine", 16.211, 11632325, "2/21/2022 2:49:00 PM"],
+        ["C1", "S4", "Cocaine", 15.463, 25371720, "4/11/2022 02:26:00 PM"],
+        ["C1", "S5", "Cocaine", 15.149, 3080717, "1/09/2022 03:18:00 PM"],
+        ["C2", "S6", "Cocaine", 16.444, 39398596, "5/29/2022 7:35:00 PM"],
+        ["C2", "S7", "Cocaine", 15.92, 458923852, "12/30/2022 8:13:00 PM"],
+        ["C2", "S8", "Cocaine", 16.455, 32857482, "5/31/2022 12:00:00 PM"],
+        ["C4", "S9", "Cocaine", 15.457, 57296846, "1/20/2022 9:20:00 PM"],
+        ["C4", "S10", "Cocaine", 15.423, 113748525, "1/07/2022 8:34:00 PM"],
+        ["C1", "S11", "Heroin", 20.132, 869472714, "4/22/2022 8:26:00 PM"],
+        ["C1", "S12", "Heroin", 21.967, 294958194, "03/15/2022 4:49:00 PM"],
+        ["C1", "S13", "Heroin", 20.136, 973718485, "05/20/2022 4:20:00 PM"],
+        ["C2", "S14", "Heroin", 20.142, 1253547582, "4/03/2022 7:59:00 PM"],
+        ["C2", "S15", "Heroin", 20.563, 8883747569, "8/11/2022 6:39:00 PM"],
         [
+          "C2",
           "S16",
           "Methamphetamine",
           10.934,
           86927247692,
-          "09/18/2022  4:26:00 PM",
+          "09/18/2022 4:26:00 PM",
         ],
-        ["S17", "Methamphetamine", 11.867, 637288582, "05/31/2022  6:00:00 PM"],
         [
+          "C3",
+          "S17",
+          "Methamphetamine",
+          11.867,
+          637288582,
+          "05/31/2022 6:00:00 PM",
+        ],
+        [
+          "C3",
           "S18",
           "Methamphetamine",
           10.921,
           1234958295,
-          "08/23/2022  7:11:00 AM",
+          "08/23/2022 7:11:00 AM",
         ],
         [
+          "C4",
           "S19",
           "Methamphetamine",
           11.572,
           43285729384,
-          "10/22/2022  7:26:00 PM",
+          "10/22/2022 7:26:00 PM",
         ],
         [
+          "C4",
           "S20",
           "Methamphetamine",
           10.822,
           76463837587,
-          "09/30/2022  8:26:00 PM",
+          "09/30/2022 8:26:00 PM",
         ],
       ];
 
@@ -1002,6 +1194,7 @@
             td.textContent = cell;
             tr.appendChild(td);
           });
+
           table.appendChild(tr);
         });
       }
@@ -1034,10 +1227,22 @@
         const rows = document.querySelectorAll("#all-samples-table tbody tr");
         let visibleCount = 0;
 
-        rows.forEach((row) => {
-          const drugType = row.children[1].textContent;
+        // Get selected case from dropdown
+        const selectedCase = document.getElementById("case-filter").value;
 
-          if (selectedDrugs.size === 0 || selectedDrugs.has(drugType)) {
+        rows.forEach((row) => {
+          const caseID = row.children[0].textContent; // Case ID is now in the first column
+          const drugType = row.children[2].textContent; // Drug Type remains in column 2
+
+          // Check if case filter matches or if nothing is selected
+          const matchesCase = !selectedCase || caseID === selectedCase;
+
+          // Check if drug filter matches or no filter selected
+          const matchesDrug =
+            selectedDrugs.size === 0 || selectedDrugs.has(drugType);
+
+          // Show row only if both case and drug filters match
+          if (matchesCase && matchesDrug) {
             row.style.display = "";
             visibleCount++;
           } else {
@@ -1045,6 +1250,7 @@
           }
         });
 
+        // Update sample count display
         document.getElementById("sample-count").textContent = visibleCount;
       }
 
@@ -1188,6 +1394,136 @@
 
         saveAs(blob, `Forensic_Report_${date.replace(/\//g, "-")}.doc`);
       }
+
+      let currentMode = "info";
+
+      let latestSampleID = null;
+
+      document.querySelectorAll(".mode-pill").forEach((pill) => {
+        pill.addEventListener("click", () => {
+          document
+            .querySelectorAll(".mode-pill")
+            .forEach((p) => p.classList.remove("active"));
+          pill.classList.add("active");
+          currentMode = pill.dataset.mode;
+          updateModeView();
+        });
+      });
+
+      function updateModeView() {
+        document.getElementById("chart-mode-container").style.display =
+          currentMode === "spectrum" ? "block" : "none";
+        document.getElementById("info-mode-container").style.display =
+          currentMode === "info" ? "block" : "none";
+        document.getElementById("peaks-mode-container").style.display =
+          currentMode === "peaks" ? "block" : "none";
+
+        if (currentMode === "peaks" && latestSampleID) {
+          updatePeaksView(latestSampleID); // ✅ render peaks table & chart
+        }
+      }
+
+      document
+        .querySelector("#results-table tbody")
+        .addEventListener("click", (e) => {
+          const row = e.target.closest("tr");
+          if (!row) return;
+          const sampleID = row.children[0].textContent;
+          updateSampleChart(sampleID); // 🔁 this triggers both chart and info view update
+        });
+
+      let peaksChart = null;
+
+      function updatePeaksView(sampleID) {
+        const chromData = chromFiles[sampleID];
+        const numPeaks = parseInt(
+          document.getElementById("peaks-dropdown").value
+        );
+        const lines = chromData.trim().split("\n").slice(3); // skip headers
+
+        const data = lines.map((line) => {
+          const [rt, ab] = line.trim().split(/[,\t ]+/);
+          return { rt: parseFloat(rt), ab: parseFloat(ab) };
+        });
+
+        const sorted = [...data].sort((a, b) => b.ab - a.ab);
+        const top = sorted.slice(0, numPeaks);
+        const tbody = document.querySelector("#peaks-table tbody");
+        tbody.innerHTML = "";
+
+        top.forEach((row, i) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td>${i + 1}</td><td>${row.ab}</td><td>${
+            row.rt
+          }</td>`;
+          tr.addEventListener("click", () => highlightPeak(row.rt, row.ab));
+          tbody.appendChild(tr);
+        });
+
+        // Plot top 50 points
+        // Plot top 50 points sorted by retention time (ascending)
+        const top50 = [...data].sort((a, b) => b.ab - a.ab).slice(0, 30);
+        top50.sort((a, b) => a.rt - b.rt); // 🔁 sort by RT ascending
+
+        const labels = top50.map((d) => d.rt.toFixed(3));
+        const values = top50.map((d) => d.ab);
+
+        const bgColors = Array(50).fill("rgba(0, 123, 255, 0.6)");
+
+        if (peaksChart) peaksChart.destroy();
+
+        peaksChart = new Chart(
+          document.getElementById("peaksChart").getContext("2d"),
+          {
+            type: "bar",
+            data: {
+              labels: labels,
+              datasets: [
+                {
+                  label: "Abundance",
+                  data: values,
+                  backgroundColor: bgColors,
+                },
+              ],
+            },
+            options: {
+              scales: {
+                x: { title: { display: true, text: "Retention Time" } },
+                y: { title: { display: true, text: "Abundance" } },
+              },
+            },
+          }
+        );
+
+        // Store for row highlight
+        peaksChart._highlightColors = bgColors;
+        peaksChart._highlightLabels = labels;
+      }
+
+      document
+        .getElementById("peaks-dropdown")
+        .addEventListener("change", () => {
+          if (latestSampleID) updatePeaksView(latestSampleID);
+        });
+
+      function highlightPeak(rt, ab) {
+        const index = peaksChart._highlightLabels.findIndex(
+          (label) => parseFloat(label) === parseFloat(rt.toFixed(3))
+        );
+        if (index !== -1) {
+          const newColors = [...peaksChart._highlightColors].fill(
+            "rgba(0, 123, 255, 0.6)"
+          );
+          newColors[index] = "red";
+          peaksChart.data.datasets[0].backgroundColor = newColors;
+          peaksChart.update();
+        }
+      }
+
+      // Add event listener to case filter dropdown
+      document
+        .getElementById("case-filter")
+        .addEventListener("change", filterSamplesTable);
     </script>
   </body>
 </html>
