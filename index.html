@@ -2312,11 +2312,11 @@
         const foundHeaders = document.querySelectorAll(
           "#found-matches-table th"
         );
-        foundHeaders[0].textContent = t.sampleID;
-        foundHeaders[1].textContent = t.drugType;
-        foundHeaders[2].textContent = t.retentionTime;
-        foundHeaders[3].textContent = t.maxAbundance;
-        foundHeaders[4].textContent = t.submissionTime;
+        foundHeaders[0].textContent = t.caseID;
+        foundHeaders[1].textContent = t.sampleID;
+        foundHeaders[2].textContent = t.drugType;
+        foundHeaders[3].textContent = t.retentionTime;
+        foundHeaders[4].textContent = t.maxAbundance;
         foundHeaders[5].textContent = t.difference;
 
         document.querySelectorAll("h1")[1].textContent = t.allSamples;
