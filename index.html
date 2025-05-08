@@ -136,9 +136,6 @@
         margin-right: 25px;
       }
 
-      #summary-container {
-        display: none;
-      }
 
       #peaks-table th {
         position: sticky;
@@ -316,7 +313,7 @@
       </div>
 
       <!-- Right Result Container -->
-      <div class="result-area" style="width: 60%; display: none">
+      <div class="result-area" style="width: 60%">
         <h3 style="text-align: center">Results</h3>
 
         <div
@@ -337,7 +334,7 @@
           Processing... Please wait
         </div>
 
-        <table id="results-table" class="tab">
+        <table id="results-table" class="tab" style="display: none;">
           <thead>
             <tr>
               <th>Case ID</th>
@@ -975,7 +972,11 @@
         document.getElementById("analyze-button").style.display =
           "inline-block";
         document.getElementById("summary-container").style.display = "block";
+document.getElementById("results-table").style.display = "none";
+
       }
+
+
 
       function readFile(file) {
         return new Promise((res, rej) => {
@@ -1488,6 +1489,10 @@
         document.getElementById("chart-mode-container").style.display = "none";
         document.getElementById("info-mode-container").style.display = "none";
         document.getElementById("peaks-mode-container").style.display = "none";
+
+// ✅ Safe to set this now
+  document.getElementById("ai-time-val").textContent = "0 minutes";
+
       };
 
       const selectedDrugs = new Set();
@@ -2140,7 +2145,8 @@
   ${t.submitted} <span style="color:darkgreen">${numSamples}</span> ${t.samplesContaining} 
   <span style="color:darkgreen">${totalRows} rows</span><br><br>
   ${t.manualTime}<br><span style="color:darkgreen">${estTime} minutes</span><br><br>
-  ${t.aiTime}<br><span style="color:darkgreen">8 minutes</span>
+ ${t.aiTime}<br><span id="ai-time-val" style="color:darkgreen">10 minutes</span>
+
 `;
       }
 
